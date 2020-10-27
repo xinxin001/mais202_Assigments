@@ -48,9 +48,15 @@ Keep on adding in the section below any modules you use as you are completing th
 import csv
 import random
 ### Answer starts here ###
+from sklearn.metrics import accuracy_score
+from sklearn import svm
+import re
+from collections import Counter
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
 ### Answer ends here ###font
 
 """Let's download the dataset:"""
@@ -100,7 +106,9 @@ Create a function called `clean`, which takes a string and then:
 
 def clean(review):
   ### Start of Answer ###
-  
+  cleanr = re.compile('<.*?>|[^a-zA-Z\d\s]')
+  review = re.sub(cleanr, '', review)
+  return review.lower()
   ### End of Answer ###
 
 """Test your function with this example string"""
@@ -136,7 +144,10 @@ For example, the string `"This movie made me cry"` will become a vector of size 
 
 def get_vocab(reviews, vocab_size):
   ### Answer starts here ###
-  
+  splitrs = []
+  for review in reviews:
+    splitrs += review.split()
+  return [word for word, word_counter in Counter(splitrs).most_common(vocab_size)]
   ### Answer ends here ###
 
 """Test your function with the following code. The `vocabulary` variable should have a length of 10,000 and the most common words should be "the", "and", "a", etc."""
@@ -148,7 +159,12 @@ print(vocabulary)
 
 def vectorize(review_string, vocab):
   ### Answer starts here ###
-  
+  splitr = review_string.split()
+  vector = [0]*num_features
+  for word in splitr:
+    if word in vocab:
+      vector[vocab.index(word)] = 1
+  return vector
   ### Answer ends here ###
 
 """Test your function with the following input. The vector should have four "1"s."""
@@ -160,7 +176,7 @@ print(sum(vector))
 """Now, vectorize the whole dataset."""
 
 ### Answer starts here ###
-
+X_train_vect = [vectorize(x, vocabulary) for x in X_train]
 ### Answer ends here ###
 
 for i in range(5):
@@ -272,8 +288,38 @@ Remember that you are *estimating* the probabilities using the training set only
 """
 
 ### Answer starts here ###
+prob_y = []
+prob_x_if_y = []
 
+good_prob = 0
+bad_prob = 0
+good_prob_x = np.zeros(num_features)
+bad_prob_x = np.zeros(num_features)
+for i in range(len(X_train_vect)):
+  if y_train[i] == 1:
+    good_prob +=1
+    good_prob_x = np.add(good_prob_x, X_train_vect[i]) 
+  if y_train[i] == -1:
+    bad_prob += 1
+    bad_prob_x = np.add(bad_prob_x, X_train_vect[i])
+
+good_prob = good_prob/len(X_train_vect)
+bad_prob = bad_prob/len(X_train_vect)
+good_prob_x = np.true_divide(good_prob_x,len(X_train_vect))
+bad_prob_x = np.true_divide(bad_prob_x,len(X_train_vect))
+
+prob_y.append([-1 ,bad_prob])
+prob_y.append([1 ,good_prob])
+prob_x_if_y.append([-1, bad_prob_x])
+prob_x_if_y.append([1, good_prob_x])
+
+print(prob_y)
+print(prob_x_if_y)
 ### Answer ends here ###
+
+print(np.array(prob_y).shape)
+print(np.array(prob_x_if_y).shape)
+print(prob_x_if_y[0])
 
 """### Question 3.2 Creating the Naive Bayes Classifier
 
@@ -282,7 +328,16 @@ Create a function called `naive_bayes` which will take as input a list of featur
 
 def naive_bayes(vec):
   ### Answer starts here ###
-  
+  prob_good = prob_y[1][1]
+  prob_bad = prob_y[0][1]
+  for i in range(len(vec)):
+    if vec[i] == 1:
+      prob_good = prob_good * prob_x_if_y[1][1][i]
+      prob_bad = prob_bad * prob_x_if_y[0][1][i]
+  if prob_good >= prob_bad:
+    return 1
+  else:
+    return -1
   ### Answer ends here ###
 
 """### Question 3.3 Measuring Performance
@@ -295,14 +350,17 @@ Using the naive Bayes classifier, predict the classes for each sample point in t
 """
 
 ### Answer starts here ###
-
+y_pred = []
+for x in X_test:
+  y_pred.append(naive_bayes(x))
+print(accuracy_score(y_test, y_pred))
 ### Answer ends here ###
 
 print(naive_bayes(preprocess_sample_point(
     'Terrible. Horrible. Boring. This movie is bad', vocabulary)))
 
 print(naive_bayes(preprocess_sample_point(
-    'This movie was pretty good', vocabulary)))
+    'very nice good amazing good', vocabulary)))
 
 """## 4. Support Vector Machines
 
@@ -318,8 +376,13 @@ Using `scikit-learn`, create a support vector classifier for our review data.
 """
 
 ### Answer starts here ###
-
+svm_clf = svm.LinearSVC()
+svm_clf.fit(X_train_vect, y_train)
 ### Answer ends here ###
+
+print(accuracy_score(y_train, svm_clf.predict(X_train_vect)))
+
+print(accuracy_score(y_test, svm_clf.predict(X_test)))
 
 print(svm_clf.predict([preprocess_sample_point(
     'Boring. Such a bad movie. It was terrible and predictable', vocabulary)]))
@@ -345,8 +408,16 @@ Be sure to check the [documentation](http://scikit-learn.org/stable/modules/gene
 """
 
 ### Answer starts here ###
-
+rfc = RandomForestClassifier(n_estimators=1200,
+                             max_depth=25, 
+                             max_features='auto', 
+                             min_samples_split=12)
+rfc.fit(X_train_vect, y_train)
 ### Answer ends here ###
+
+print(accuracy_score(y_train, rfc.predict(X_train_vect)))
+
+print(accuracy_score(y_test, rfc.predict(X_test)))
 
 print(rfc.predict([preprocess_sample_point(
     'Boring. This movie is terrible', vocabulary)]))
@@ -360,7 +431,7 @@ Tell us about your hyperparamter tuning in a few sentences! What was your approa
 
 #############
 
- **ANSWER HERE**
+I've played with the parameters with no clear theoretical understanding. As far as I know, increasing the n_estimators, max_depth and min_samples_split as much as possible increased the accuracy by 10%.
 
 #############
 
